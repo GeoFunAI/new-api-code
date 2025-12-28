@@ -169,6 +169,17 @@ func SetApiRouter(router *gin.Engine) {
 			tokenRoute.POST("/batch", controller.DeleteTokenBatch)
 		}
 
+		// Admin proxy routes for managing user tokens
+		adminTokenRoute := apiRouter.Group("/admin/user/:user_id/token")
+		adminTokenRoute.Use(middleware.AdminAuth())
+		{
+			adminTokenRoute.GET("/", controller.AdminGetUserTokens)
+			adminTokenRoute.GET("/:id", controller.AdminGetUserToken)
+			adminTokenRoute.POST("/", controller.AdminAddUserToken)
+			adminTokenRoute.PUT("/", controller.AdminUpdateUserToken)
+			adminTokenRoute.DELETE("/:id", controller.AdminDeleteUserToken)
+		}
+
 		usageRoute := apiRouter.Group("/usage")
 		usageRoute.Use(middleware.CriticalRateLimit())
 		{

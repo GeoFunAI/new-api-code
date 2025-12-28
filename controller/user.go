@@ -871,9 +871,22 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
+	// Get the inserted user ID
+	var insertedUser model.User
+	if err := model.DB.Where("username = ?", cleanUser.Username).First(&insertedUser).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "用户创建成功但获取用户ID失败: " + err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
+		"data": gin.H{
+			"id": insertedUser.Id,
+		},
 	})
 	return
 }

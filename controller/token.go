@@ -242,6 +242,9 @@ func UpdateToken(c *gin.Context) {
 	} else {
 		// If you add more fields, please also update token.Update()
 		cleanToken.Name = token.Name
+		if token.Status != 0 {
+			cleanToken.Status = token.Status // Also update Status when updating all fields
+		}
 		cleanToken.ExpiredTime = token.ExpiredTime
 		cleanToken.RemainQuota = token.RemainQuota
 		cleanToken.UnlimitedQuota = token.UnlimitedQuota
@@ -461,6 +464,9 @@ func AdminUpdateUserToken(c *gin.Context) {
 	} else {
 		// If you add more fields, please also update token.Update()
 		cleanToken.Name = token.Name
+		if token.Status != 0 {
+			cleanToken.Status = token.Status // Also update Status when updating all fields
+		}
 		cleanToken.ExpiredTime = token.ExpiredTime
 		cleanToken.RemainQuota = token.RemainQuota
 		cleanToken.UnlimitedQuota = token.UnlimitedQuota

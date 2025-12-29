@@ -146,6 +146,70 @@ func GetLogsSelfStat(c *gin.Context) {
 	return
 }
 
+// AdminGetUserLogs gets logs for a specific user (admin only)
+// Used by nicecode proxy to get consumption details
+func AdminGetUserLogs(c *gin.Context) {
+	userId, err := strconv.Atoi(c.Param("user_id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "invalid user_id",
+		})
+		return
+	}
+
+	pageInfo := common.GetPageQuery(c)
+	logType, _ := strconv.Atoi(c.Query("type"))
+	startTimestamp, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	endTimestamp, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	tokenName := c.Query("token_name")
+	modelName := c.Query("model_name")
+	tokenId, _ := strconv.Atoi(c.Query("token_id"))
+	group := c.Query("group")
+
+	logs, total, err := model.GetUserLogsWithTokenId(userId, logType, startTimestamp, endTimestamp, modelName, tokenName, tokenId, pageInfo.GetStartIdx(), pageInfo.GetPageSize(), group)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(logs)
+	common.ApiSuccess(c, pageInfo)
+	return
+}
+
+// GetLogByRequestId gets a log entry by request_id (for precise matching)
+// Used by nicecode proxy to get exact log for a specific request
+func GetLogByRequestId(c *gin.Context) {
+	requestId := c.Query("request_id")
+	if requestId == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": "request_id is required",
+		})
+		return
+	}
+
+	log, err := model.GetLogByRequestId(requestId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	if log == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    nil,
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    log,
+	})
+}
+
 func DeleteHistoryLogs(c *gin.Context) {
 	targetTimestamp, _ := strconv.ParseInt(c.Query("target_timestamp"), 10, 64)
 	if targetTimestamp == 0 {

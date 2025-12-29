@@ -180,6 +180,13 @@ func SetApiRouter(router *gin.Engine) {
 			adminTokenRoute.DELETE("/:id", controller.AdminDeleteUserToken)
 		}
 
+		// Token info route - get token info by token key (for nicecode proxy)
+		tokenInfoRoute := apiRouter.Group("/token")
+		tokenInfoRoute.Use(middleware.CORS())
+		{
+			tokenInfoRoute.GET("/info", controller.GetTokenInfo)
+		}
+
 		usageRoute := apiRouter.Group("/usage")
 		usageRoute.Use(middleware.CriticalRateLimit())
 		{
@@ -209,6 +216,16 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), controller.SearchUserLogs)
+
+		// Admin route to get logs for a specific user (for nicecode proxy)
+		adminLogRoute := apiRouter.Group("/admin/user/:user_id/log")
+		adminLogRoute.Use(middleware.AdminAuth())
+		{
+			adminLogRoute.GET("/", controller.AdminGetUserLogs)
+		}
+
+		// Admin route to get log by request_id (for nicecode proxy precise matching)
+		apiRouter.GET("/admin/log/by-request-id", middleware.AdminAuth(), controller.GetLogByRequestId)
 
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)

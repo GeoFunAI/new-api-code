@@ -135,6 +135,59 @@ func GetTokenUsage(c *gin.Context) {
 	})
 }
 
+// GetTokenInfo returns token information by token key (from Authorization header)
+// This is used by nicecode proxy to identify the user from their token
+func GetTokenInfo(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"message": "No Authorization header",
+		})
+		return
+	}
+
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"message": "Invalid Bearer token format",
+		})
+		return
+	}
+	tokenKey := parts[1]
+
+	token, err := model.GetTokenByKey(strings.TrimPrefix(tokenKey, "sk-"), false)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"id":                   token.Id,
+			"user_id":              token.UserId,
+			"name":                 token.Name,
+			"status":               token.Status,
+			"created_time":         token.CreatedTime,
+			"accessed_time":        token.AccessedTime,
+			"expired_time":         token.ExpiredTime,
+			"remain_quota":         token.RemainQuota,
+			"used_quota":           token.UsedQuota,
+			"unlimited_quota":      token.UnlimitedQuota,
+			"model_limits_enabled": token.ModelLimitsEnabled,
+			"model_limits":         token.GetModelLimitsMap(),
+			"group":                token.Group,
+			"cross_group_retry":    token.CrossGroupRetry,
+		},
+	})
+}
+
 func AddToken(c *gin.Context) {
 	token := model.Token{}
 	err := c.ShouldBindJSON(&token)

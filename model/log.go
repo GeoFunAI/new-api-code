@@ -36,6 +36,7 @@ type Log struct {
 	TokenId          int    `json:"token_id" gorm:"default:0;index"`
 	Group            string `json:"group" gorm:"index"`
 	Ip               string `json:"ip" gorm:"index;default:''"`
+	RequestId        string `json:"request_id" gorm:"index;default:''"` // For precise log matching
 	Other            string `json:"other"`
 }
 
@@ -150,6 +151,7 @@ type RecordConsumeLogParams struct {
 	UseTimeSeconds   int                    `json:"use_time_seconds"`
 	IsStream         bool                   `json:"is_stream"`
 	Group            string                 `json:"group"`
+	RequestId        string                 `json:"request_id"` // For precise log matching
 	Other            map[string]interface{} `json:"other"`
 }
 
@@ -183,6 +185,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UseTime:          params.UseTimeSeconds,
 		IsStream:         params.IsStream,
 		Group:            params.Group,
+		RequestId:        func(c *gin.Context) string {
+			if params.RequestId != "" {
+				return params.RequestId
+			}
+			return c.GetHeader("X-Request-ID")
+		}(c),
 		Ip: func() string {
 			if needRecordIp {
 				return c.ClientIP()
@@ -301,6 +309,63 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 
 	formatUserLogs(logs)
 	return logs, total, err
+}
+
+// GetUserLogsWithTokenId gets logs for a specific user with optional token_id filter
+// Used by admin API for nicecode proxy
+func GetUserLogsWithTokenId(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, tokenId int, startIdx int, num int, group string) (logs []*Log, total int64, err error) {
+	var tx *gorm.DB
+	if logType == LogTypeUnknown {
+		tx = LOG_DB.Where("logs.user_id = ?", userId)
+	} else {
+		tx = LOG_DB.Where("logs.user_id = ? and logs.type = ?", userId, logType)
+	}
+
+	if modelName != "" {
+		tx = tx.Where("logs.model_name like ?", modelName)
+	}
+	if tokenName != "" {
+		tx = tx.Where("logs.token_name = ?", tokenName)
+	}
+	if tokenId > 0 {
+		tx = tx.Where("logs.token_id = ?", tokenId)
+	}
+	if startTimestamp != 0 {
+		tx = tx.Where("logs.created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("logs.created_at <= ?", endTimestamp)
+	}
+	if group != "" {
+		tx = tx.Where("logs."+logGroupCol+" = ?", group)
+	}
+	err = tx.Model(&Log{}).Count(&total).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	err = tx.Order("logs.id desc").Limit(num).Offset(startIdx).Find(&logs).Error
+	if err != nil {
+		return nil, 0, err
+	}
+
+	formatUserLogs(logs)
+	return logs, total, err
+}
+
+// GetLogByRequestId gets a log entry by request_id (for precise matching)
+func GetLogByRequestId(requestId string) (*Log, error) {
+	if requestId == "" {
+		return nil, nil
+	}
+	var log Log
+	err := LOG_DB.Where("request_id = ?", requestId).First(&log).Error
+	if err != nil {
+		if err.Error() == "record not found" {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &log, nil
 }
 
 func SearchAllLogs(keyword string) (logs []*Log, err error) {

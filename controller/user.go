@@ -1113,6 +1113,115 @@ func TopUp(c *gin.Context) {
 	})
 }
 
+// BatchQuotaUpdateItem 批量额度更新请求项
+type BatchQuotaUpdateItem struct {
+	UserID int `json:"user_id"`
+	Quota  int `json:"quota"`
+}
+
+// BatchQuotaUpdateRequest 批量额度更新请求
+type BatchQuotaUpdateRequest struct {
+	Updates []BatchQuotaUpdateItem `json:"updates"`
+}
+
+// BatchQuotaResult 批量额度更新结果项
+type BatchQuotaResult struct {
+	UserID  int    `json:"user_id"`
+	Success bool   `json:"success"`
+	Error   string `json:"error,omitempty"`
+}
+
+// BatchUpdateUserQuota 批量更新用户额度 (管理员接口)
+// 用于一次性更新多个用户的额度，降低逐个操作的风险
+func BatchUpdateUserQuota(c *gin.Context) {
+	var req BatchQuotaUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "无效的参数: " + err.Error(),
+		})
+		return
+	}
+
+	if len(req.Updates) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "更新列表不能为空",
+		})
+		return
+	}
+
+	myRole := c.GetInt("role")
+	results := make([]BatchQuotaResult, 0, len(req.Updates))
+
+	for _, item := range req.Updates {
+		result := BatchQuotaResult{
+			UserID:  item.UserID,
+			Success: true,
+		}
+
+		// 获取原用户信息
+		originUser, err := model.GetUserById(item.UserID, false)
+		if err != nil {
+			result.Success = false
+			result.Error = "用户不存在"
+			results = append(results, result)
+			continue
+		}
+
+		// 权限检查
+		if myRole <= originUser.Role && myRole != common.RoleRootUser {
+			result.Success = false
+			result.Error = "无权更新此用户"
+			results = append(results, result)
+			continue
+		}
+
+		// 更新额度
+		updatedUser := *originUser
+		updatedUser.Quota = item.Quota
+
+		if err := updatedUser.Edit(false); err != nil {
+			result.Success = false
+			result.Error = err.Error()
+			results = append(results, result)
+			continue
+		}
+
+		// 记录日志
+		if originUser.Quota != item.Quota {
+			model.RecordLog(originUser.Id, model.LogTypeManage,
+				fmt.Sprintf("管理员批量将用户额度从 %s修改为 %s",
+					logger.LogQuota(originUser.Quota),
+					logger.LogQuota(item.Quota)))
+		}
+
+		results = append(results, result)
+	}
+
+	// 统计结果
+	successCount := 0
+	failedCount := 0
+	for _, r := range results {
+		if r.Success {
+			successCount++
+		} else {
+			failedCount++
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": fmt.Sprintf("批量更新完成: 成功 %d, 失败 %d", successCount, failedCount),
+		"data": gin.H{
+			"total":         len(req.Updates),
+			"success_count": successCount,
+			"failed_count":  failedCount,
+			"results":       results,
+		},
+	})
+}
+
 type UpdateUserSettingRequest struct {
 	QuotaWarningType           string  `json:"notify_type"`
 	QuotaWarningThreshold      float64 `json:"quota_warning_threshold"`

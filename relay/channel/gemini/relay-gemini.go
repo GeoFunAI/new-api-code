@@ -32,6 +32,7 @@ var geminiSupportedMimeTypes = map[string]bool{
 	"audio/wav":       true,
 	"image/png":       true,
 	"image/jpeg":      true,
+	"image/jpg":       true, // support old image/jpeg
 	"image/webp":      true,
 	"text/plain":      true,
 	"video/mov":       true,
@@ -374,7 +375,7 @@ func CovertOpenAI2Gemini(c *gin.Context, textRequest dto.GeneralOpenAIRequest, i
 	var system_content []string
 	//shouldAddDummyModelMessage := false
 	for _, message := range textRequest.Messages {
-		if message.Role == "system" {
+		if message.Role == "system" || message.Role == "developer" {
 			system_content = append(system_content, message.StringContent())
 			continue
 		} else if message.Role == "tool" || message.Role == "function" {

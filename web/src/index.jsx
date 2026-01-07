@@ -33,106 +33,45 @@ import { useTranslation } from 'react-i18next';
 import zh_CN from '@douyinfe/semi-ui/lib/es/locale/source/zh_CN';
 import en_GB from '@douyinfe/semi-ui/lib/es/locale/source/en_GB';
 
-// 特殊路径验证
-const SECRET_PATH = '2026666';
-const STORAGE_KEY = 'path_verified';
-
-function checkAccess() {
-  const isVerified = sessionStorage.getItem(STORAGE_KEY);
-
-  if (!isVerified) {
-    const urlParams = new URLSearchParams(window.location.search);
-    const pathKey = urlParams.get('access');
-
-    // 从 hash 中提取参数
-    const hash = window.location.hash.substring(1);
-    let hashKey = null;
-
-    if (hash && !hash.includes('/') && !hash.includes('?')) {
-      hashKey = hash;
-    } else if (hash.includes('?')) {
-      const hashParams = new URLSearchParams(hash.split('?')[1]);
-      hashKey = hashParams.get('access');
-    }
-
-    if (pathKey === SECRET_PATH || hashKey === SECRET_PATH) {
-      sessionStorage.setItem(STORAGE_KEY, 'true');
-      if (pathKey) {
-        urlParams.delete('access');
-        const newUrl =
-          window.location.pathname +
-          (urlParams.toString() ? '?' + urlParams.toString() : '') +
-          window.location.hash;
-        window.history.replaceState({}, document.title, newUrl);
-      }
-      return true;
-    }
-    return false;
-  }
-  return true;
-}
-
-// 检查访问权限
-if (!checkAccess()) {
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(
-    <div
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        height: '100vh',
-        fontFamily: 'sans-serif',
-        flexDirection: 'column',
-      }}
-    >
-      <h1>访问被拒绝</h1>
-      <p>需要特殊访问权限</p>
-      <p style={{ color: '#888', fontSize: '12px' }}>
-        Access Denied - Special Permission Required
-      </p>
-    </div>,
-  );
-} else {
-  // 欢迎信息（二次开发者未经允许不准将此移除）
-  // Welcome message (Do not remove this without permission from the original developer)
-  if (typeof window !== 'undefined') {
-    console.log(
-      '%cWE ❤ NEWAPI%c Github: https://github.com/QuantumNous/new-api',
-      'color: #10b981; font-weight: bold; font-size: 24px;',
-      'color: inherit; font-size: 14px;',
-    );
-  }
-
-  function SemiLocaleWrapper({ children }) {
-    const { i18n } = useTranslation();
-    const semiLocale = React.useMemo(
-      () => ({ zh: zh_CN, en: en_GB })[i18n.language] || zh_CN,
-      [i18n.language],
-    );
-    return <LocaleProvider locale={semiLocale}>{children}</LocaleProvider>;
-  }
-
-  // initialization
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(
-    <React.StrictMode>
-      <StatusProvider>
-        <UserProvider>
-          <BrowserRouter
-            future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true,
-            }}
-          >
-            <ThemeProvider>
-              <SemiLocaleWrapper>
-                <PageLayout />
-              </SemiLocaleWrapper>
-            </ThemeProvider>
-          </BrowserRouter>
-        </UserProvider>
-      </StatusProvider>
-    </React.StrictMode>,
+// 欢迎信息（二次开发者未经允许不准将此移除）
+// Welcome message (Do not remove this without permission from the original developer)
+if (typeof window !== 'undefined') {
+  console.log(
+    '%cWE ❤ NEWAPI%c Github: https://github.com/QuantumNous/new-api',
+    'color: #10b981; font-weight: bold; font-size: 24px;',
+    'color: inherit; font-size: 14px;',
   );
 }
+
+function SemiLocaleWrapper({ children }) {
+  const { i18n } = useTranslation();
+  const semiLocale = React.useMemo(
+    () => ({ zh: zh_CN, en: en_GB })[i18n.language] || zh_CN,
+    [i18n.language],
+  );
+  return <LocaleProvider locale={semiLocale}>{children}</LocaleProvider>;
+}
+
+// initialization
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(
+  <React.StrictMode>
+    <StatusProvider>
+      <UserProvider>
+        <BrowserRouter
+          future={{
+            v7_startTransition: true,
+            v7_relativeSplatPath: true,
+          }}
+        >
+          <ThemeProvider>
+            <SemiLocaleWrapper>
+              <PageLayout />
+            </SemiLocaleWrapper>
+          </ThemeProvider>
+        </BrowserRouter>
+      </UserProvider>
+    </StatusProvider>
+  </React.StrictMode>,
+);

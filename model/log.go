@@ -9,6 +9,7 @@ import (
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/logger"
+	"github.com/QuantumNous/new-api/nicecode"
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
@@ -206,6 +207,25 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	if common.DataExportEnabled {
 		gopool.Go(func() {
 			LogQuotaData(userId, username, params.ModelName, params.Quota, common.GetTimestamp(), params.PromptTokens+params.CompletionTokens)
+		})
+	}
+
+	// 如果启用了 nicecode 集成，且请求不是来自 nicecode，则记录消耗到 nicecode
+	// X-Request-ID 存在说明是从 nicecode 来的请求，不需要再记录回去
+	if common.NicecodeEnabled && c.GetHeader("X-Request-ID") == "" {
+		clientIP := c.ClientIP() // 在 goroutine 外获取 IP
+		gopool.Go(func() {
+			nicecode.RecordConsumeLog(
+				userId,
+				params.TokenId,
+				params.ModelName,
+				params.Quota,
+				params.PromptTokens,
+				params.CompletionTokens,
+				params.Other,
+				params.RequestId,
+				clientIP,
+			)
 		})
 	}
 }

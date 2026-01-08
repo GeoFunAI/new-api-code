@@ -109,6 +109,12 @@ func InitEnv() {
 	CriticalRateLimitEnable = GetEnvOrDefaultBool("CRITICAL_RATE_LIMIT_ENABLE", true)
 	CriticalRateLimitNum = GetEnvOrDefault("CRITICAL_RATE_LIMIT", 20)
 	CriticalRateLimitDuration = int64(GetEnvOrDefault("CRITICAL_RATE_LIMIT_DURATION", 20*60))
+
+	// Initialize Nicecode integration settings
+	NicecodeEnabled = GetEnvOrDefaultBool("NICECODE_ENABLED", false)
+	NicecodeURL = GetEnvOrDefaultString("NICECODE_URL", "")
+	NicecodeAPIKey = GetEnvOrDefaultString("NICECODE_API_KEY", "")
+
 	initConstantEnv()
 }
 

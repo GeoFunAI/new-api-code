@@ -9,39 +9,6 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <script>
-      // 特殊路径验证
-      (function() {
-        const SECRET_PATH = 'admin-portal'; // 修改为你想要的特殊路径标识
-        const STORAGE_KEY = 'path_verified';
-
-        // 检查是否已验证过（使用 sessionStorage，关闭浏览器后需重新验证）
-        const isVerified = sessionStorage.getItem(STORAGE_KEY);
-
-        if (!isVerified) {
-          // 检查 URL 中是否包含特殊路径参数
-          const urlParams = new URLSearchParams(window.location.search);
-          const pathKey = urlParams.get('access');
-          const hashKey = window.location.hash.substring(1).split('?')[0];
-
-          // 验证访问密钥
-          if (pathKey === SECRET_PATH || hashKey === SECRET_PATH) {
-            // 验证通过，保存到 sessionStorage
-            sessionStorage.setItem(STORAGE_KEY, 'true');
-            // 清理 URL 中的访问参数（可选）
-            if (pathKey) {
-              urlParams.delete('access');
-              const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '') + window.location.hash;
-              window.history.replaceState({}, document.title, newUrl);
-            }
-          } else {
-            // 验证失败，显示错误信息并阻止访问
-            document.getElementById('root').innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;flex-direction:column;"><h1>访问被拒绝</h1><p>需要特殊访问权限</p><p style="color:#888;font-size:12px;">Access Denied - Special Permission Required</p></div>';
-            throw new Error('访问路径验证失败');
-          }
-        }
-      })();
-    </script>
     <script type="module" src="/src/index.jsx"></script>
   </body>
 </html>

@@ -85,6 +85,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	defer func() {
 		if newAPIError != nil {
+			channelId := c.GetInt("channel_id")
+			channelName := c.GetString("channel_name")
+			modelName := c.GetString("original_model")
+			fmt.Printf("[AI Model Error] Channel: #%d (%s), Model: %s, Error: %s\n", channelId, channelName, modelName, newAPIError.Error())
 			logger.LogError(c, fmt.Sprintf("relay error: %s", newAPIError.Error()))
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
 			switch relayFormat {

@@ -1,6 +1,7 @@
 package model_setting
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/QuantumNous/new-api/setting/config"
@@ -22,6 +23,8 @@ type ClaudeSettings struct {
 	DefaultBetaEnabled bool `json:"default_beta_enabled"`
 	// 默认的 anthropic-beta header 值
 	DefaultBetaHeader string `json:"default_beta_header"`
+	// 默认的 tools 定义（用于 Claude Code 兼容）
+	DefaultTools json.RawMessage `json:"default_tools"`
 }
 
 // 默认配置

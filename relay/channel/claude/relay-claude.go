@@ -76,6 +76,14 @@ func RequestOpenAI2ClaudeComplete(textRequest dto.GeneralOpenAIRequest) *dto.Cla
 }
 
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest) (*dto.ClaudeRequest, error) {
+	claudeSettings := model_setting.GetClaudeSettings()
+
+	// 如果启用了 DefaultBetaEnabled 且没有 tools，使用默认 tools
+	var defaultTools []any
+	if claudeSettings.DefaultBetaEnabled && len(textRequest.Tools) == 0 && len(claudeSettings.DefaultTools) > 0 {
+		_ = json.Unmarshal(claudeSettings.DefaultTools, &defaultTools)
+	}
+
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
 	for _, tool := range textRequest.Tools {
@@ -152,6 +160,14 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		claudeTools = append(claudeTools, &webSearchTool)
 	}
 
+	// 决定使用哪个 tools：用户提供的 > 默认的
+	var finalTools []any
+	if len(claudeTools) > 0 {
+		finalTools = claudeTools
+	} else if len(defaultTools) > 0 {
+		finalTools = defaultTools
+	}
+
 	claudeRequest := dto.ClaudeRequest{
 		Model:         textRequest.Model,
 		MaxTokens:     textRequest.GetMaxTokens(),
@@ -160,7 +176,7 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		TopP:          textRequest.TopP,
 		TopK:          textRequest.TopK,
 		Stream:        textRequest.Stream,
-		Tools:         claudeTools,
+		Tools:         finalTools,
 	}
 
 	// 处理 tool_choice 和 parallel_tool_calls
@@ -415,7 +431,6 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 
 	// 传递 metadata（如 user_id 等）
 	// 如果启用了 DefaultBetaEnabled 且没有 user_id，自动生成符合 Claude CLI 格式的 user_id
-	claudeSettings := model_setting.GetClaudeSettings()
 	if claudeSettings.DefaultBetaEnabled {
 		// 解析现有 metadata
 		var metadataMap map[string]interface{}

@@ -410,6 +410,11 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 		claudeRequest.System = systemMessages
 	}
 
+	// 传递 metadata（如 user_id 等）
+	if textRequest.Metadata != nil {
+		claudeRequest.Metadata = textRequest.Metadata
+	}
+
 	claudeRequest.Prompt = ""
 	claudeRequest.Messages = claudeMessages
 	return &claudeRequest, nil

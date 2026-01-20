@@ -18,6 +18,10 @@ type ClaudeSettings struct {
 	DefaultMaxTokens                      map[string]int                 `json:"default_max_tokens"`
 	ThinkingAdapterEnabled                bool                           `json:"thinking_adapter_enabled"`
 	ThinkingAdapterBudgetTokensPercentage float64                        `json:"thinking_adapter_budget_tokens_percentage"`
+	// 是否默认启用 beta 特性（添加 ?beta=true 和相关 header）
+	DefaultBetaEnabled bool `json:"default_beta_enabled"`
+	// 默认的 anthropic-beta header 值
+	DefaultBetaHeader string `json:"default_beta_header"`
 }
 
 // 默认配置
@@ -28,6 +32,9 @@ var defaultClaudeSettings = ClaudeSettings{
 		"default": 8192,
 	},
 	ThinkingAdapterBudgetTokensPercentage: 0.8,
+	// 默认启用 beta 特性，兼容新模型
+	DefaultBetaEnabled: true,
+	DefaultBetaHeader:  "interleaved-thinking-2025-05-14",
 }
 
 // 全局实例

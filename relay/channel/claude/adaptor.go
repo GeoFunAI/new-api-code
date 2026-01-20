@@ -59,24 +59,59 @@ func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
 	} else {
 		baseURL = fmt.Sprintf("%s/v1/complete", info.ChannelBaseUrl)
 	}
-	if info.IsClaudeBetaQuery {
+	// 如果客户端指定了 beta=true，或者配置启用了默认 beta
+	if info.IsClaudeBetaQuery || model_setting.GetClaudeSettings().DefaultBetaEnabled {
 		baseURL = baseURL + "?beta=true"
 	}
 	return baseURL, nil
 }
 
 func CommonClaudeHeadersOperation(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) {
-	// common headers operation
+	claudeSettings := model_setting.GetClaudeSettings()
+
+	// 透传或设置默认 anthropic-beta header
 	anthropicBeta := c.Request.Header.Get("anthropic-beta")
 	if anthropicBeta != "" {
 		req.Set("anthropic-beta", anthropicBeta)
+	} else if claudeSettings.DefaultBetaEnabled && claudeSettings.DefaultBetaHeader != "" {
+		// 使用配置的默认 beta header
+		req.Set("anthropic-beta", claudeSettings.DefaultBetaHeader)
 	}
-	model_setting.GetClaudeSettings().WriteHeaders(info.OriginModelName, req)
+
+	// 透传或设置默认 anthropic-dangerous-direct-browser-access header
+	dangerousAccess := c.Request.Header.Get("anthropic-dangerous-direct-browser-access")
+	if dangerousAccess != "" {
+		req.Set("anthropic-dangerous-direct-browser-access", dangerousAccess)
+	} else if claudeSettings.DefaultBetaEnabled {
+		// 默认设置为 true（仅在启用 beta 时）
+		req.Set("anthropic-dangerous-direct-browser-access", "true")
+	}
+
+	// 透传其他可能的 anthropic 相关 header
+	for key, values := range c.Request.Header {
+		lowerKey := strings.ToLower(key)
+		// 透传所有 x-stainless-* 和其他 anthropic 相关 header
+		if strings.HasPrefix(lowerKey, "x-stainless-") ||
+			strings.HasPrefix(lowerKey, "x-app") {
+			for _, value := range values {
+				req.Set(key, value)
+			}
+		}
+	}
+
+	claudeSettings.WriteHeaders(info.OriginModelName, req)
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
 	channel.SetupApiRequestHeader(info, c, req)
+
+	// 默认使用 x-api-key 认证（Claude 官方格式）
 	req.Set("x-api-key", info.ApiKey)
+
+	// 同时设置 Authorization: Bearer 格式，兼容某些第三方代理
+	// 如果上游只需要其中一种，可以通过 HeaderOverride 覆盖
+	req.Set("Authorization", "Bearer "+info.ApiKey)
+
 	anthropicVersion := c.Request.Header.Get("anthropic-version")
 	if anthropicVersion == "" {
 		anthropicVersion = "2023-06-01"

@@ -78,9 +78,12 @@ func RequestOpenAI2ClaudeComplete(textRequest dto.GeneralOpenAIRequest) *dto.Cla
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest) (*dto.ClaudeRequest, error) {
 	claudeSettings := model_setting.GetClaudeSettings()
 
-	// 如果启用了 DefaultBetaEnabled 且没有 tools，使用默认 tools
+	// 如果启用了 DefaultBetaEnabled，检查是否使用默认 tools
+	// ForceDefaultTools=true 时强制替换，否则仅在没有 tools 时使用
 	var defaultTools []any
-	if claudeSettings.DefaultBetaEnabled && len(textRequest.Tools) == 0 && len(claudeSettings.DefaultTools) > 0 {
+	useDefaultTools := claudeSettings.DefaultBetaEnabled && len(claudeSettings.DefaultTools) > 0 &&
+		(claudeSettings.ForceDefaultTools || len(textRequest.Tools) == 0)
+	if useDefaultTools {
 		_ = json.Unmarshal(claudeSettings.DefaultTools, &defaultTools)
 	}
 

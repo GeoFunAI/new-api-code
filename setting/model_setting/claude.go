@@ -25,6 +25,8 @@ type ClaudeSettings struct {
 	DefaultBetaHeader string `json:"default_beta_header"`
 	// 默认的 tools 定义（用于 Claude Code 兼容）
 	DefaultTools json.RawMessage `json:"default_tools"`
+	// 是否强制使用默认 tools（替换用户请求中的 tools）
+	ForceDefaultTools bool `json:"force_default_tools"`
 }
 
 // 默认配置

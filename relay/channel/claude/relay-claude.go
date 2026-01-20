@@ -78,19 +78,49 @@ func RequestOpenAI2ClaudeComplete(textRequest dto.GeneralOpenAIRequest) *dto.Cla
 func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRequest) (*dto.ClaudeRequest, error) {
 	claudeSettings := model_setting.GetClaudeSettings()
 
+	// 检查原始 User-Agent，如果是 opencode 等非 claude-cli，自动启用 force_default_tools
+	userAgent := c.GetHeader("User-Agent")
+	forceDefaultTools := claudeSettings.ForceDefaultTools
+	if !forceDefaultTools && userAgent != "" {
+		userAgentLower := strings.ToLower(userAgent)
+		// 检测是否为 claude-cli 官方客户端
+		isClaudeCLI := strings.Contains(userAgentLower, "claude-cli") || 
+		               strings.Contains(userAgentLower, "anthropic-cli")
+		// 检测已知的非 claude-cli 客户端（opencode、cursor 等）
+		isNonClaudeClient := strings.Contains(userAgentLower, "opencode") ||
+		                     strings.Contains(userAgentLower, "cursor") ||
+		                     (strings.Contains(userAgentLower, "vscode") && !isClaudeCLI)
+		// 如果检测到非 claude-cli 客户端，自动启用 force_default_tools
+		if isNonClaudeClient {
+			forceDefaultTools = true
+			logger.LogInfo(c, fmt.Sprintf("Auto-enabled force_default_tools due to User-Agent: %s", userAgent))
+		}
+	}
+
+	// 调试：打印配置状态
+	logger.LogInfo(c, fmt.Sprintf("Claude config: DefaultBetaEnabled=%v, ForceDefaultTools=%v (config=%v), User tools count=%d",
+		claudeSettings.DefaultBetaEnabled, forceDefaultTools, claudeSettings.ForceDefaultTools, len(textRequest.Tools)))
+
 	// 如果启用了 DefaultBetaEnabled，检查是否使用默认 tools
 	// ForceDefaultTools=true 时强制替换，否则仅在没有 tools 时使用
 	var defaultTools []any
-	useDefaultTools := claudeSettings.DefaultBetaEnabled && len(claudeSettings.DefaultTools) > 0 &&
-		(claudeSettings.ForceDefaultTools || len(textRequest.Tools) == 0)
+	useDefaultTools := claudeSettings.DefaultBetaEnabled &&
+		(forceDefaultTools || len(textRequest.Tools) == 0)
 	if useDefaultTools {
-		_ = json.Unmarshal(claudeSettings.DefaultTools, &defaultTools)
+		var err error
+		defaultTools, err = GetClaudeCodeTools()
+		if err != nil {
+			logger.LogError(c, fmt.Sprintf("Failed to load Claude Code tools: %v", err))
+		} else {
+			logger.LogInfo(c, fmt.Sprintf("Loaded %d Claude Code tools, ForceDefaultTools=%v, user tools count=%d",
+				len(defaultTools), forceDefaultTools, len(textRequest.Tools)))
+		}
 	}
 
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
 	// 如果强制使用默认 tools，跳过处理用户提供的 tools
-	if !claudeSettings.ForceDefaultTools {
+	if !forceDefaultTools {
 		for _, tool := range textRequest.Tools {
 			if params, ok := tool.Function.Parameters.(map[string]any); ok {
 			claudeTool := dto.Tool{
@@ -168,15 +198,18 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 
 	// 决定使用哪个 tools：强制默认 > 用户提供的 > 默认的
 	var finalTools []any
-	if claudeSettings.ForceDefaultTools && len(defaultTools) > 0 {
+	if forceDefaultTools && len(defaultTools) > 0 {
 		// 强制使用默认 tools
 		finalTools = defaultTools
+		logger.LogInfo(c, fmt.Sprintf("Using FORCED default tools (%d tools)", len(finalTools)))
 	} else if len(claudeTools) > 0 {
 		// 使用用户提供的 tools
 		finalTools = claudeTools
+		logger.LogInfo(c, fmt.Sprintf("Using user-provided tools (%d tools)", len(finalTools)))
 	} else if len(defaultTools) > 0 {
 		// 没有用户 tools 时使用默认 tools
 		finalTools = defaultTools
+		logger.LogInfo(c, fmt.Sprintf("Using default tools (no user tools, %d tools)", len(finalTools)))
 	}
 
 	claudeRequest := dto.ClaudeRequest{

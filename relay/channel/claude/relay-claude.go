@@ -412,7 +412,14 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 					}
 				}
 			} else if message.IsStringContent() && message.ToolCalls == nil {
-				claudeMessage.Content = message.StringContent()
+				// 检查内容是否为空，如果为空则跳过或使用占位符
+				content := message.StringContent()
+				if strings.TrimSpace(content) == "" {
+					// 空内容，使用占位符
+					claudeMessage.Content = "..."
+				} else {
+					claudeMessage.Content = content
+				}
 			} else {
 				claudeMediaMessages := make([]dto.ClaudeMediaMessage, 0)
 				for _, mediaMessage := range message.ParseContent() {
@@ -420,7 +427,13 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 						Type: mediaMessage.Type,
 					}
 					if mediaMessage.Type == "text" {
-						claudeMediaMessage.Text = common.GetPointer[string](mediaMessage.Text)
+						// 检查文本内容是否为空，空文本块会导致 API 错误
+						textContent := strings.TrimSpace(mediaMessage.Text)
+						if textContent == "" {
+							// 跳过空的文本块
+							continue
+						}
+						claudeMediaMessage.Text = common.GetPointer[string](textContent)
 					} else {
 						imageUrl := mediaMessage.GetImageMedia()
 						claudeMediaMessage.Type = "image"
@@ -461,6 +474,25 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 							Input: inputObj,
 						})
 					}
+				}
+				// 检查是否有有效的文本内容块或 tool_use
+				hasValidContent := false
+				for _, msg := range claudeMediaMessages {
+					if msg.Type == "text" && msg.Text != nil && strings.TrimSpace(*msg.Text) != "" {
+						hasValidContent = true
+						break
+					}
+					if msg.Type == "tool_use" || msg.Type == "tool_result" || msg.Type == "image" {
+						hasValidContent = true
+						break
+					}
+				}
+				// 如果没有任何有效内容，添加占位符文本
+				if !hasValidContent {
+					claudeMediaMessages = append(claudeMediaMessages, dto.ClaudeMediaMessage{
+						Type: "text",
+						Text: common.GetPointer[string]("..."),
+					})
 				}
 				claudeMessage.Content = claudeMediaMessages
 			}

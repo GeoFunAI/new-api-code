@@ -89,8 +89,10 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 
 	claudeTools := make([]any, 0, len(textRequest.Tools))
 
-	for _, tool := range textRequest.Tools {
-		if params, ok := tool.Function.Parameters.(map[string]any); ok {
+	// 如果强制使用默认 tools，跳过处理用户提供的 tools
+	if !claudeSettings.ForceDefaultTools {
+		for _, tool := range textRequest.Tools {
+			if params, ok := tool.Function.Parameters.(map[string]any); ok {
 			claudeTool := dto.Tool{
 				Name:        tool.Function.Name,
 				Description: tool.Function.Description,
@@ -108,12 +110,12 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 				claudeTool.InputSchema[s] = a
 			}
 			claudeTools = append(claudeTools, &claudeTool)
+			}
 		}
-	}
 
-	// Web search tool
-	// https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-search-tool
-	if textRequest.WebSearchOptions != nil {
+		// Web search tool
+		// https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/web-search-tool
+		if textRequest.WebSearchOptions != nil {
 		webSearchTool := dto.ClaudeWebSearchTool{
 			Type: "web_search_20250305",
 			Name: "web_search",
@@ -160,14 +162,20 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 			}
 		}
 
-		claudeTools = append(claudeTools, &webSearchTool)
+			claudeTools = append(claudeTools, &webSearchTool)
+		}
 	}
 
-	// 决定使用哪个 tools：用户提供的 > 默认的
+	// 决定使用哪个 tools：强制默认 > 用户提供的 > 默认的
 	var finalTools []any
-	if len(claudeTools) > 0 {
+	if claudeSettings.ForceDefaultTools && len(defaultTools) > 0 {
+		// 强制使用默认 tools
+		finalTools = defaultTools
+	} else if len(claudeTools) > 0 {
+		// 使用用户提供的 tools
 		finalTools = claudeTools
 	} else if len(defaultTools) > 0 {
+		// 没有用户 tools 时使用默认 tools
 		finalTools = defaultTools
 	}
 

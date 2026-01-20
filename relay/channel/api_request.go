@@ -3,10 +3,13 @@ package channel
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -93,25 +96,46 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
 
-	// 调试：打印完整的请求信息
+	// 调试：将请求信息写入文件（格式兼容 replay 工具）
 	if common2.DebugEnabled {
-		println("\n========== Claude API Request Debug ==========")
-		println("URL:", fullRequestURL)
-		println("Method:", req.Method)
-		println("\n--- Headers ---")
+		// 解析 URL
+		parsedURL, _ := url.Parse(fullRequestURL)
+		path := parsedURL.Path
+		query := parsedURL.RawQuery
+
+		// 收集 headers
+		headersMap := make(map[string]string)
 		for key, values := range headers {
-			for _, value := range values {
-				if strings.ToLower(key) == "authorization" || strings.ToLower(key) == "x-api-key" {
-					println(key + ": ***masked***")
-				} else {
-					println(key + ": " + value)
-				}
+			if len(values) > 0 {
+				headersMap[key] = values[0]
 			}
 		}
-		if len(bodyBytes) > 0 {
-			println("\n--- Request Body ---")
-			println(string(bodyBytes))
+
+		// 构建兼容 replay 工具的日志格式
+		requestLog := map[string]interface{}{
+			"timestamp":    time.Now().Format(time.RFC3339),
+			"method":       req.Method,
+			"path":         path,
+			"headers":      headersMap,
+			"body":         string(bodyBytes),
+			"client_ip":    "upstream",
+			"user_agent":   headersMap["User-Agent"],
+			"content_type": headersMap["Content-Type"],
 		}
+		if query != "" {
+			requestLog["query"] = query
+		}
+
+		// 写入文件
+		logBytes, _ := json.Marshal(requestLog)
+		logFile := "/tmp/upstream_request.json"
+		_ = os.WriteFile(logFile, logBytes, 0644)
+
+		// 打印提示
+		println("\n========== Upstream Request Debug ==========")
+		println("Log file:", logFile)
+		println("URL:", fullRequestURL)
+		println("Method:", req.Method)
 		println("========== End Debug ==========\n")
 	}
 

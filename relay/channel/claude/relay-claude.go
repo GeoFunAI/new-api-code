@@ -1,6 +1,8 @@
 package claude
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +20,7 @@ import (
 	"github.com/QuantumNous/new-api/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
@@ -411,7 +414,37 @@ func RequestOpenAI2ClaudeMessage(c *gin.Context, textRequest dto.GeneralOpenAIRe
 	}
 
 	// 传递 metadata（如 user_id 等）
-	if textRequest.Metadata != nil {
+	// 如果启用了 DefaultBetaEnabled 且没有 user_id，自动生成符合 Claude CLI 格式的 user_id
+	claudeSettings := model_setting.GetClaudeSettings()
+	if claudeSettings.DefaultBetaEnabled {
+		// 解析现有 metadata
+		var metadataMap map[string]interface{}
+		if len(textRequest.Metadata) > 0 {
+			_ = json.Unmarshal(textRequest.Metadata, &metadataMap)
+		}
+		if metadataMap == nil {
+			metadataMap = make(map[string]interface{})
+		}
+		// 如果没有 user_id，自动生成
+		if _, hasUserId := metadataMap["user_id"]; !hasUserId {
+			// 从 context 获取用户信息
+			userId := c.GetInt("id")
+			tokenId := c.GetInt("token_id")
+			tokenKey, _ := c.Get("token_key")
+			tokenKeyStr, _ := tokenKey.(string)
+			// 生成格式: user_{sha256_hash}_account__session_{uuid}
+			hashInput := fmt.Sprintf("%d_%d_%s", userId, tokenId, tokenKeyStr)
+			hash := sha256.Sum256([]byte(hashInput))
+			hashStr := hex.EncodeToString(hash[:])
+			sessionUUID := uuid.New().String()
+			metadataMap["user_id"] = fmt.Sprintf("user_%s_account__session_%s", hashStr, sessionUUID)
+		}
+		// 重新序列化为 json.RawMessage
+		if metadataBytes, err := json.Marshal(metadataMap); err == nil {
+			textRequest.Metadata = metadataBytes
+		}
+	}
+	if len(textRequest.Metadata) > 0 {
 		claudeRequest.Metadata = textRequest.Metadata
 	}
 

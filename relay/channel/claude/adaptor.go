@@ -99,6 +99,21 @@ func CommonClaudeHeadersOperation(c *gin.Context, req *http.Header, info *relayc
 		}
 	}
 
+	// 如果没有 X-Stainless-* header，设置默认值（模拟 Claude CLI）
+	if c.Request.Header.Get("X-Stainless-Lang") == "" && claudeSettings.DefaultBetaEnabled {
+		req.Set("X-App", "cli")
+		req.Set("X-Stainless-Lang", "js")
+		req.Set("X-Stainless-Runtime", "node")
+		req.Set("X-Stainless-Runtime-Version", "v22.0.0")
+		req.Set("X-Stainless-Arch", "x64")
+		req.Set("X-Stainless-Os", "Linux")
+		req.Set("X-Stainless-Package-Version", "0.70.0")
+		req.Set("X-Stainless-Retry-Count", "0")
+		req.Set("X-Stainless-Timeout", "600")
+		// 模拟 Claude CLI 的 User-Agent
+		req.Set("User-Agent", "claude-cli/2.1.12 (external, cli)")
+	}
+
 	claudeSettings.WriteHeaders(info.OriginModelName, req)
 }
 

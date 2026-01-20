@@ -1,6 +1,7 @@
 package channel
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -63,9 +64,18 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
-	if common2.DebugEnabled {
-		println("fullRequestURL:", fullRequestURL)
+
+	// 调试模式：读取请求体用于打印
+	var bodyBytes []byte
+	if common2.DebugEnabled && requestBody != nil {
+		bodyBytes, err = io.ReadAll(requestBody)
+		if err != nil {
+			return nil, fmt.Errorf("read request body failed: %w", err)
+		}
+		// 重新创建 reader
+		requestBody = bytes.NewReader(bodyBytes)
 	}
+
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
@@ -82,6 +92,29 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
+
+	// 调试：打印完整的请求信息
+	if common2.DebugEnabled {
+		println("\n========== Claude API Request Debug ==========")
+		println("URL:", fullRequestURL)
+		println("Method:", req.Method)
+		println("\n--- Headers ---")
+		for key, values := range headers {
+			for _, value := range values {
+				if strings.ToLower(key) == "authorization" || strings.ToLower(key) == "x-api-key" {
+					println(key + ": ***masked***")
+				} else {
+					println(key + ": " + value)
+				}
+			}
+		}
+		if len(bodyBytes) > 0 {
+			println("\n--- Request Body ---")
+			println(string(bodyBytes))
+		}
+		println("========== End Debug ==========\n")
+	}
+
 	resp, err := doRequest(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)

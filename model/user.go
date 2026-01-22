@@ -357,7 +357,7 @@ func (user *User) TransferAffQuotaToQuota(quota int) error {
 
 	// 再次检查用户的AffQuota是否足够
 	if user.AffQuota < quota {
-		return errors.New("邀请额度不足！")
+		return fmt.Errorf("邀请%s不足！", logger.GetQuotaUnit())
 	}
 
 	// 更新用户额度

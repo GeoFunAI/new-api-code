@@ -333,14 +333,14 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 		}
 		return true
 	}
-	if openaiErr.StatusCode == http.StatusBadRequest {
-		return false
-	}
 	if openaiErr.StatusCode == 408 {
 		// azure处理超时不重试
 		return false
 	}
-	// 403
+	// 400 和 403 允许重试
+	if openaiErr.StatusCode == http.StatusBadRequest {
+		return true
+	}
 	if openaiErr.StatusCode == http.StatusForbidden {
 		return true
 	}

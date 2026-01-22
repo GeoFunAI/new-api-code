@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/nicecode"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
@@ -124,6 +125,11 @@ func LogQuota(quota int) string {
 }
 
 func FormatQuota(quota int) string {
+	// 如果启用了 nicecode，尝试转换为积分显示
+	if common.NicecodeEnabled {
+		return FormatQuotaWithCredits(quota)
+	}
+
 	q := float64(quota)
 	switch operation_setting.GetQuotaDisplayType() {
 	case operation_setting.QuotaDisplayTypeCNY:
@@ -147,6 +153,29 @@ func FormatQuota(quota int) string {
 	default:
 		return fmt.Sprintf("＄%.6f", q/common.QuotaPerUnit)
 	}
+}
+
+// FormatQuotaWithCredits 将额度转换为积分显示
+func FormatQuotaWithCredits(quota int) string {
+	// 尝试获取积分比例
+	ratio, err := nicecode.GetCreditToQuotaRatio()
+	if err != nil || ratio <= 0 {
+		// 获取失败，回退到原来的格式化方式
+		q := float64(quota)
+		return fmt.Sprintf("＄%.6f", q/common.QuotaPerUnit)
+	}
+
+	// 将额度转换为积分：积分 = 额度 / 比例
+	credits := float64(quota) / float64(ratio)
+	return fmt.Sprintf("%.2f 积分", credits)
+}
+
+// GetQuotaUnit 返回"额度"或"积分"的文字描述
+func GetQuotaUnit() string {
+	if common.NicecodeEnabled {
+		return "积分"
+	}
+	return "额度"
 }
 
 // LogJson 仅供测试使用 only for test

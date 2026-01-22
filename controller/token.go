@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/logger"
 	"github.com/QuantumNous/new-api/model"
 
 	"github.com/gin-gonic/gin"
@@ -321,7 +322,7 @@ func UpdateToken(c *gin.Context) {
 		if cleanToken.Status == common.TokenStatusExhausted && cleanToken.RemainQuota <= 0 && !cleanToken.UnlimitedQuota {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "令牌可用额度已用尽，无法启用，请先修改令牌剩余额度，或者设置为无限额度",
+				"message": fmt.Sprintf("令牌可用%s已用尽，无法启用，请先修改令牌剩余%s，或者设置为无限%s", logger.GetQuotaUnit(), logger.GetQuotaUnit(), logger.GetQuotaUnit()),
 			})
 			return
 		}
@@ -542,7 +543,7 @@ func AdminUpdateUserToken(c *gin.Context) {
 		if cleanToken.Status == common.TokenStatusExhausted && cleanToken.RemainQuota <= 0 && !cleanToken.UnlimitedQuota {
 			c.JSON(http.StatusOK, gin.H{
 				"success": false,
-				"message": "令牌可用额度已用尽，无法启用，请先修改令牌剩余额度，或者设置为无限额度",
+				"message": fmt.Sprintf("令牌可用%s已用尽，无法启用，请先修改令牌剩余%s，或者设置为无限%s", logger.GetQuotaUnit(), logger.GetQuotaUnit(), logger.GetQuotaUnit()),
 			})
 			return
 		}

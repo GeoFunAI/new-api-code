@@ -15,6 +15,12 @@ import (
 var (
 	nicecodeClient     *http.Client
 	nicecodeClientOnce sync.Once
+
+	// 积分比例缓存
+	cacheMutex          sync.RWMutex
+	creditToQuotaRatio  int64
+	cacheExpireTime     time.Time
+	cacheDuration       = 5 * time.Minute // 缓存5分钟
 )
 
 // initNicecodeClient 初始化 nicecode HTTP 客户端（全局单例）
@@ -184,4 +190,86 @@ func RecordConsumeLog(userId, tokenId int, modelName string, quota, promptTokens
 	if err := sendConsumeLog(common.NicecodeURL, common.NicecodeAPIKey, req); err != nil {
 		common.SysLog(fmt.Sprintf("Failed to record consume log to nicecode: %v", err))
 	}
+}
+
+// StatusResponse nicecode 状态响应
+type StatusResponse struct {
+	Success bool `json:"success"`
+	Data    struct {
+		CreditToQuotaRatio int64 `json:"credit_to_quota_ratio"`
+		CreditToPriceRatio int64 `json:"credit_to_price_ratio"`
+	} `json:"data"`
+}
+
+// getStatus 获取 nicecode 状态信息
+func getStatus(baseURL string) (*StatusResponse, error) {
+	if baseURL == "" {
+		return nil, fmt.Errorf("nicecode not configured")
+	}
+
+	url := baseURL + "/api/status"
+	client := getNicecodeClient()
+
+	httpReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := client.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("nicecode API returned status %d", resp.StatusCode)
+	}
+
+	var result StatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	if !result.Success {
+		return nil, fmt.Errorf("nicecode API returned success=false")
+	}
+
+	return &result, nil
+}
+
+// GetCreditToQuotaRatio 获取积分转额度比例（带缓存）
+func GetCreditToQuotaRatio() (int64, error) {
+	if common.NicecodeURL == "" {
+		return 0, fmt.Errorf("nicecode not configured")
+	}
+
+	// 先检查缓存
+	cacheMutex.RLock()
+	if creditToQuotaRatio > 0 && time.Now().Before(cacheExpireTime) {
+		ratio := creditToQuotaRatio
+		cacheMutex.RUnlock()
+		return ratio, nil
+	}
+	cacheMutex.RUnlock()
+
+	// 缓存过期或未初始化，获取新数据
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
+	// 双重检查，防止并发请求
+	if creditToQuotaRatio > 0 && time.Now().Before(cacheExpireTime) {
+		return creditToQuotaRatio, nil
+	}
+
+	// 调用 API 获取状态
+	status, err := getStatus(common.NicecodeURL)
+	if err != nil {
+		return 0, err
+	}
+
+	// 更新缓存
+	creditToQuotaRatio = status.Data.CreditToQuotaRatio
+	cacheExpireTime = time.Now().Add(cacheDuration)
+
+	return creditToQuotaRatio, nil
 }

@@ -340,6 +340,10 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 		// azure处理超时不重试
 		return false
 	}
+	// 403
+	if openaiErr.StatusCode == http.StatusForbidden {
+		return true
+	}
 	if openaiErr.StatusCode/100 == 2 {
 		return false
 	}

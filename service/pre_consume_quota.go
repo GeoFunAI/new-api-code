@@ -39,7 +39,7 @@ func PreConsumeQuota(c *gin.Context, preConsumedQuota int, relayInfo *relaycommo
 		return types.NewErrorWithStatusCode(fmt.Errorf("用户%s不足, 剩余%s: %s", logger.GetQuotaUnit(), logger.GetQuotaUnit(), logger.FormatQuota(userQuota)), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 	if userQuota-preConsumedQuota < 0 {
-		return types.NewErrorWithStatusCode(fmt.Errorf("预扣费%s失败, 用户剩余%s: %s, 需要预扣费%s: %s", logger.GetQuotaUnit(), logger.GetQuotaUnit(), logger.FormatQuota(userQuota), logger.GetQuotaUnit(), logger.FormatQuota(preConsumedQuota)), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		return types.NewErrorWithStatusCode(fmt.Errorf("预扣费%s失败, 用户%s不足, 需要预扣费%s: %s", logger.GetQuotaUnit(), logger.GetQuotaUnit(), logger.GetQuotaUnit(), logger.FormatQuota(preConsumedQuota)), types.ErrorCodeInsufficientUserQuota, http.StatusForbidden, types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
 	}
 
 	trustQuota := common.GetTrustQuota()

@@ -13,6 +13,7 @@ import (
 func SetRelayRouter(router *gin.Engine) {
 	router.Use(middleware.CORS())
 	router.Use(middleware.DecompressRequestMiddleware())
+	router.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	router.Use(middleware.StatsMiddleware())
 	// router.Use(middleware.NiceCode())
 
@@ -94,6 +95,9 @@ func SetRelayRouter(router *gin.Engine) {
 		// response related routes
 		httpRouter.POST("/responses", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIResponses)
+		})
+		httpRouter.POST("/responses/compact", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIResponsesCompaction)
 		})
 
 		// image related routes

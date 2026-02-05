@@ -37,7 +37,7 @@ type Log struct {
 	TokenId          int    `json:"token_id" gorm:"default:0;index"`
 	Group            string `json:"group" gorm:"index"`
 	Ip               string `json:"ip" gorm:"index;default:''"`
-	RequestId        string `json:"request_id" gorm:"index;default:''"` // For precise log matching
+	RequestId        string `json:"request_id,omitempty" gorm:"type:varchar(64);index:idx_logs_request_id;default:''"`
 	Other            string `json:"other"`
 }
 
@@ -60,7 +60,6 @@ func formatUserLogs(logs []*Log) {
 		if otherMap != nil {
 			// Remove admin-only debug fields.
 			delete(otherMap, "admin_info")
-			delete(otherMap, "request_conversion")
 			delete(otherMap, "reject_reason")
 		}
 		logs[i].Other = common.MapToJsonStr(otherMap)
@@ -104,6 +103,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	isStream bool, group string, other map[string]interface{}) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, content))
 	username := c.GetString("username")
+	requestId := c.GetString(common.RequestIdKey)
 	otherStr := common.MapToJsonStr(other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -134,7 +134,8 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 			}
 			return ""
 		}(),
-		Other: otherStr,
+		RequestId: requestId,
+		Other:     otherStr,
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {
@@ -164,6 +165,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	}
 	logger.LogInfo(c, fmt.Sprintf("record consume log: userId=%d, params=%s", userId, common.GetJsonString(params)))
 	username := c.GetString("username")
+	requestId := c.GetString(common.RequestIdKey)
 	otherStr := common.MapToJsonStr(params.Other)
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -200,7 +202,8 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			}
 			return ""
 		}(),
-		Other: otherStr,
+		RequestId: requestId,
+		Other:     otherStr,
 	}
 	err := LOG_DB.Create(log).Error
 	if err != nil {
@@ -232,7 +235,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	}
 }
 
-func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string) (logs []*Log, total int64, err error) {
+func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, group string, requestId string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB
@@ -248,6 +251,9 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	}
 	if tokenName != "" {
 		tx = tx.Where("logs.token_name = ?", tokenName)
+	}
+	if requestId != "" {
+		tx = tx.Where("logs.request_id = ?", requestId)
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)
@@ -297,7 +303,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	return logs, total, err
 }
 
-func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string) (logs []*Log, total int64, err error) {
+func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, group string, requestId string) (logs []*Log, total int64, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {
 		tx = LOG_DB.Where("logs.user_id = ?", userId)
@@ -310,6 +316,9 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	}
 	if tokenName != "" {
 		tx = tx.Where("logs.token_name = ?", tokenName)
+	}
+	if requestId != "" {
+		tx = tx.Where("logs.request_id = ?", requestId)
 	}
 	if startTimestamp != 0 {
 		tx = tx.Where("logs.created_at >= ?", startTimestamp)

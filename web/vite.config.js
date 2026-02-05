@@ -91,7 +91,7 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://code-api.nicecode.ai',
+        target: 'http://z',
         changeOrigin: true,
       },
       '/mj': {

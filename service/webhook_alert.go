@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
@@ -38,17 +39,31 @@ func sendFeishuRelayAlert(relayInfo *relaycommon.RelayInfo, apiErr *types.NewAPI
 	now := time.Now().Format("2006-01-02 15:04:05")
 	retryDetail := buildRetryDetail(usedChannels)
 
+	host := relayInfo.RequestHeaders["Host"]
+	if host == "" {
+		host = relayInfo.RequestHeaders["host"]
+	}
+	if host == "" {
+		host = "unknown"
+	}
+
 	card := map[string]any{
 		"config": map[string]any{"wide_screen_mode": true},
 		"header": map[string]any{
-			"title":    map[string]any{"tag": "plain_text", "content": "AI 接口调用失败告警"},
+			"title":    map[string]any{"tag": "plain_text", "content": fmt.Sprintf("AI 接口调用失败告警 [%s]", host)},
 			"template": "red",
 		},
 		"elements": []any{
 			map[string]any{
 				"tag": "div",
 				"fields": []any{
+					shortField("站点", host),
 					shortField("用户 ID", fmt.Sprintf("%d", relayInfo.UserId)),
+				},
+			},
+			map[string]any{
+				"tag": "div",
+				"fields": []any{
 					shortField("Token ID", fmt.Sprintf("%d", relayInfo.TokenId)),
 				},
 			},
@@ -125,12 +140,9 @@ func buildRetryDetail(usedChannels []string) string {
 	if len(usedChannels) == 0 {
 		return "无"
 	}
-	result := ""
+	parts := make([]string, len(usedChannels))
 	for i, ch := range usedChannels {
-		if i > 0 {
-			result += " → "
-		}
-		result += fmt.Sprintf("渠道 %s", ch)
+		parts[i] = "渠道 " + ch
 	}
-	return result
+	return strings.Join(parts, " → ")
 }

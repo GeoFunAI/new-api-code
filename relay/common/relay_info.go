@@ -503,16 +503,17 @@ func cloneRequestHeaders(c *gin.Context) map[string]string {
 	if c == nil || c.Request == nil {
 		return nil
 	}
-	if len(c.Request.Header) == 0 {
-		return nil
-	}
-	headers := make(map[string]string, len(c.Request.Header))
+	headers := make(map[string]string, len(c.Request.Header)+1)
 	for key := range c.Request.Header {
 		value := strings.TrimSpace(c.Request.Header.Get(key))
 		if value == "" {
 			continue
 		}
 		headers[key] = value
+	}
+	// c.Request.Host is not part of Header map in Go's net/http
+	if host := c.Request.Host; host != "" {
+		headers["Host"] = host
 	}
 	if len(headers) == 0 {
 		return nil
